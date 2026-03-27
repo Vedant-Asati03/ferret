@@ -8,13 +8,13 @@ mod vga_buffer;
 pub extern "C" fn _start() -> ! {
     // we named the function _start because the linker by-default looks for a function named
     // _start, this function is the custom entry point we defined
-    vga_buffer::print();
-
+    println!("Hello World{}", "!");
     loop {}
 }
 
 /// This function is called on panic.
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
     loop {}
 }

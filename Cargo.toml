@@ -1,5 +1,5 @@
 [package]
-name = "minimal-rust-kernel"
+name = "ferret"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,7 +7,7 @@ edition = "2024"
 panic = "abort" # disable stack unwinding on panic
 
 [[bin]]
-name = "minimal-rust-kernel"
+name = "ferret"
 test = true
 bench = false
 

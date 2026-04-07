@@ -1,10 +1,4 @@
-use core::{
-    clone::Clone,
-    cmp::{Eq, PartialEq},
-    fmt::{Arguments, Debug, Result, Write},
-    marker::Copy,
-    prelude::rust_2024::derive,
-};
+use core::fmt::{Arguments, Result, Write};
 use lazy_static::lazy_static;
 use spin::Mutex;
 use volatile::Volatile;
@@ -48,8 +42,8 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
-const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
+const BUFFER_HEIGHT: usize = 25;
 
 #[repr(transparent)]
 struct Buffer {
@@ -60,6 +54,16 @@ pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
+}
+
+impl Writer {
+    fn new() -> Self {
+        Self {
+            column_position: 0,
+            color_code: ColorCode::new(Color::Yellow, Color::Black),
+            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        }
+    }
 }
 
 impl Writer {
@@ -104,13 +108,10 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
-}
 
-impl Writer {
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
@@ -127,11 +128,12 @@ impl Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer::new());
+}
+
+#[doc(hidden)]
+pub fn _print(args: Arguments) {
+    WRITER.lock().write_fmt(args).unwrap();
 }
 
 #[macro_export]
@@ -142,10 +144,17 @@ macro_rules! print {
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-#[doc(hidden)]
-pub fn _print(args: Arguments) {
-    WRITER.lock().write_fmt(args).unwrap();
+#[test_case]
+fn test_println_output() {
+    let some_text = "Some test string that fits on a single line";
+    println!("{}", some_text);
+
+    for (i, c) in some_text.chars().enumerate() {
+        let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+        assert_eq!(char::from(screen_char.ascii_character), c);
+    }
 }
